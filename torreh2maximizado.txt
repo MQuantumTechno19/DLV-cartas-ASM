@@ -1,0 +1,41 @@
+Para comparar cómo cambia la instanciación (grounding) y el comportamiento del solver al maximizar o minimizar la cantidad de movimientos en la Torre de Hanói (o en un problema de planificación general), la forma nativa en ASP es utilizar la directiva #minimize o #maximize sobre el tamaño del horizonte temporal $M$ o sobre los movimientos realizados.1. Modelo ASP con Minimización/Maximización EspatialesPara permitir que Clingo determine de forma autónoma el número exacto de pasos óptimo (en lugar de fijar movimientos(15) de forma rígida), se define un límite máximo de horizonte $M$ y se aplica una función de optimización:Prolog% ==========================================================
+% Torre de Hanói con Minimización / Maximización en ASP
+% ==========================================================
+#const max_pasos = 20.
+
+disco(1..4).
+clavija(a;b;c).
+paso(1..max_pasos).
+
+% --- ESTADO INICIAL ---
+en(D, a, 0) :- disco(D).
+
+% --- 1. GENERATE ---
+% En cada paso T hasta un horizonte K elegido, se realiza como máximo un movimiento
+0 { mover(D, P_dest, T) : disco(D), clavija(P_dest) } 1 :- paso(T).
+
+% --- 2. TRANSICIÓN DE ESTADOS ---
+en(D, P_dest, T) :- mover(D, P_dest, T).
+en(D, P, T) :- en(D, P, T-1), not mover(D, _, T), paso(T).
+
+% --- 3. TEST / RESTRICCIONES ---
+% No mover discos bloqueados
+:- mover(D, _, T), en(D_menor, P, T-1), en(D, P, T-1), D_menor < D.
+% No colocar sobre discos más pequeños
+:- mover(D, P_dest, T), en(D_menor, P_dest, T-1), D > D_menor.
+
+% --- 4. META (Alcanzar el objetivo en algún paso T) ---
+meta_alcanzada(T) :- paso(T), #count { D : en(D, c, T) } == 4.
+:- not meta_alcanzada(max_pasos).
+
+% ==========================================================
+% OPTIMIZACIÓN EN CLINGO
+% ==========================================================
+
+% OPCIÓN A: MINIMIZAR (Encontrar el número MÍNIMO de movimientos)
+#minimize { 1, T : mover(_, _, T) }.
+
+% OPCIÓN B: MAXIMIZAR (Encontrar la solución MÁS LARGA sin ciclos)
+% #maximize { 1, T : mover(_, _, T) }.
+
+#show mover/3.
